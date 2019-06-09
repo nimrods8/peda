@@ -19,6 +19,14 @@ import signal
 import traceback
 import codecs
 
+
+import struct, fcntl, termios
+
+#s = struct.pack('HHHH', 0, 0, 0, 0)
+#t = fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ, s)
+#print(struct.unpack('HHHH', t))
+
+
 # point to absolute path of peda.py
 PEDAFILE = os.path.abspath(os.path.expanduser(__file__))
 if os.path.islink(PEDAFILE):
@@ -59,11 +67,16 @@ REGISTERS = {
          "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]
 }
 
+#columns, rows = shutil.get_terminal_size(fallback=(80, 24))
+
+
 ###########################################################################
 class PEDA(object):
     """
     Class for actual functions of PEDA commands
     """
+    _columns, _rows = os.get_terminal_size(0)
+
     def __init__(self):
         self.SAVED_COMMANDS = {} # saved GDB user's commands
 
@@ -4250,7 +4263,11 @@ class PEDACmd(object):
 
         pc = peda.getreg("pc")
         # display register info
-        msg("[%s]" % "registers".center(78, "-"), "blue")
+        text = "[%s]" % "registers".center( self._columns/2, "-") 
+        text += "[%s]" % "registers".center( self._columns/2, "-")
+        #msg("[%s]" % "registers".center(78, "-"), "blue")
+        #msg("[%s]" % "registers".center(78, "-"), "yellow")
+        msg(text, "blue")
         self.xinfo("register")
 
         return
@@ -4265,7 +4282,7 @@ class PEDACmd(object):
         (count,) = normalize_argv(arg, 1)
 
         if count is None:
-            count = 8
+            count = 12 #8
 
         if not self._is_running():
             return
@@ -4319,6 +4336,10 @@ class PEDACmd(object):
             # stopped at other instructions
             else:
                 text += peda.disassemble_around(pc, count)
+
+                lines = text.splitlines();
+                ll = int(lines[0][1:17], 16)
+
                 msg(format_disasm_code(text, pc))
         else: # invalid $PC
             msg("Invalid $PC address: 0x%x" % pc, "red")
@@ -4833,7 +4854,8 @@ class PEDACmd(object):
             text = green("%s" % r.upper().ljust(3)) + ": "
             chain = peda.examine_mem_reference(v)
             text += format_reference_chain(chain)
-            text += "\n"
+            text = text.ljust( 78, ' ') 
+            # text += "\n"
             return text
 
         (arch, bits) = peda.getarch()
@@ -6101,6 +6123,14 @@ pedacmd.help.__func__.options = pedacmd.commands # XXX HACK
 # register "peda" command in gdb
 pedaGDBCommand()
 Alias("pead", "peda") # just for auto correction
+
+#_rows, _columns = os.popen('stty size', 'r').read().split()
+#msg( '%d %d\n' % (_rows, _columns))
+_columns, _rows = os.get_terminal_size(0)
+
+msg( 'terminal columns %d\n' % _columns)
+#raw_input("Press Enter to continue...")
+
 
 # create aliases for subcommands
 for cmd in pedacmd.commands:
