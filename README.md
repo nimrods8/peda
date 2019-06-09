@@ -30,7 +30,7 @@ PEDA - Python Exploit Development Assistance for GDB
 ## Installation
 
     git clone https://github.com/longld/peda.git ~/peda
-    echo "source ~/peda/peda.py" >> ~/.gdbinit
+    cp ~/peda/.gdbinit" ~/.gdbinit
     echo "DONE! debug your program with gdb and enjoy"
 
 ## Screenshot
