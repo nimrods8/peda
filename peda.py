@@ -68,18 +68,17 @@ REGISTERS = {
 }
 
 #columns, rows = shutil.get_terminal_size(fallback=(80, 24))
-
+_columns, _rows = os.get_terminal_size(0)
 
 ###########################################################################
 class PEDA(object):
     """
     Class for actual functions of PEDA commands
     """
-    _columns, _rows = os.get_terminal_size(0)
-
+    
     def __init__(self):
         self.SAVED_COMMANDS = {} # saved GDB user's commands
-
+        #self._columns, self._rows = os.get_terminal_size(0)
 
     ####################################
     #   GDB Interaction / Misc Utils   #
@@ -4263,8 +4262,9 @@ class PEDACmd(object):
 
         pc = peda.getreg("pc")
         # display register info
-        text = "[%s]" % "registers".center( self._columns/2, "-") 
-        text += "[%s]" % "registers".center( self._columns/2, "-")
+        cols = _columns // 2
+        text = "[%s]" % "registers".center( cols - 2, "-") 
+        text += "[%s]" % "registers".center( cols - 2, "-")
         #msg("[%s]" % "registers".center(78, "-"), "blue")
         #msg("[%s]" % "registers".center(78, "-"), "yellow")
         msg(text, "blue")
@@ -4854,18 +4854,24 @@ class PEDACmd(object):
             text = green("%s" % r.upper().ljust(3)) + ": "
             chain = peda.examine_mem_reference(v)
             text += format_reference_chain(chain)
-            text = text.ljust( 78, ' ') 
+            # text = text.ljust( _columns // 2, '*') 
             # text += "\n"
             return text
 
         (arch, bits) = peda.getarch()
         if str(address).startswith("r"):
             # Register
+
+            msg( '--------->%d'% (_columns // 2))
+
             regs = peda.getregs(" ".join(arg[1:]))
             if regname is None:
                 for r in REGISTERS[bits]:
                     if r in regs:
-                        text += get_reg_text(r, regs[r])
+                        #text += get_reg_text(r, regs[r]).rjust( _columns , '*'
+                        name = get_reg_text( r, regs[r])
+                        msg( '=======>%d' % len(name))
+                        text  += name + " "*(71) # Add extra spaces
             else:
                 for (r, v) in sorted(regs.items()):
                     text += get_reg_text(r, v)
@@ -6126,7 +6132,7 @@ Alias("pead", "peda") # just for auto correction
 
 #_rows, _columns = os.popen('stty size', 'r').read().split()
 #msg( '%d %d\n' % (_rows, _columns))
-_columns, _rows = os.get_terminal_size(0)
+#_columns, _rows = os.get_terminal_size(0)
 
 msg( 'terminal columns %d\n' % _columns)
 #raw_input("Press Enter to continue...")
