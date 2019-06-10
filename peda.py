@@ -50,6 +50,10 @@ from utils import *
 import config
 from nasm import *
 
+from pyparsing import *
+
+
+
 if sys.version_info.major is 3:
     from urllib.request import urlopen
     from urllib.parse import urlencode
@@ -80,6 +84,9 @@ class PEDA(object):
     """
 
     _dynamicBase = 0x0000                        # dynamic base address, set with 'dynamic ########'
+    _watchAddr = 0x0
+    _watchSize = 0x0
+    
 
     def __init__(self):
         self.SAVED_COMMANDS = {} # saved GDB user's commands
@@ -3056,6 +3063,23 @@ class PEDACmd(object):
         msg( 'New Dynamic Base Address is %x' % self._dynamicBase)
         return
 
+    ##################
+    #  Dynamic utils #
+    ##################
+    def watch( self, *arg):
+        """
+        Set a watch on address and size. 
+        Use 0xAAAAAAAAAA as BASE address
+        Usage:
+            MYNAME <ADDR> <SIZE>
+        """
+        (add, sze) = normalize_argv(arg, 2)
+        self._watchAddr = add
+        self._watchSize = sze
+        msg( 'New Watch @ %x' % self._watchAddr)
+        return
+
+
 
     ##################
     #   Misc Utils   #
@@ -4861,6 +4885,23 @@ class PEDACmd(object):
         return
     eflags.options = ["set", "clear", "toggle"]
 
+
+
+    #from pyparsing import *
+    #def unColorLen(self, _str):
+    #    ESC = Literal('\x1b')
+    #    integer = Word(nums)
+    #    escapeSeq = Combine(ESC + '[' + Optional(delimitedList(integer,';')) + 
+    #                        oneOf(list(alphas)))
+
+    
+    #    nonAnsiString = lambda s : Suppress(escapeSeq).transformString(s)
+    #    unColorString = nonAnsiString( _str)
+    #    #print unColorString, len(unColorString)
+    #    return 10 #len(_str)   #unColorString)
+
+
+
     def xinfo(self, *arg):
         """
         Display detail information of address/registers
@@ -4877,31 +4918,69 @@ class PEDACmd(object):
         if not self._is_running():
             return
 
-        def get_watch_text( v):
+        def unColorLen( _str):
+            ESC = Literal('\x1b')
+            integer = Word(nums)
+            #escapeSeq = Combine(ESC + '[' + Optional(delimitedList(integer,';')) +
+             #                   oneOf(list(alphas)))
+
+            #nonAnsiString = lambda s : Suppress(escapeSeq).transformString(s)
+            #unColorString = nonAnsiString( _str)
+
+
+            escapeSeq = Combine(ESC + '[' + delimitedList(integer,';') + oneOf(list(alphas)))
+  
+            s_prime = Suppress(escapeSeq).transformString(_str)
+            #s_prime = Suppress(escapeSeq).transformString(s_prime)
+            #msg(hex(ord(s_prime[0])))
+            #msg(s_prime[1])
+            #msg(s_prime[2])
+            #msg(s_prime[3])
+            #msg(s_prime[4])
+            #msg(s_prime[5])
+
+            ansisequence= re.compile(r'\x1B\[[^A-Za-z]*[A-Za-z]')
+            #msg( len(ansisequence.sub('', _str)))
+
+
+            #print unColorString, len(unColorString)
+            return len( ansisequence.sub('', _str))
+         
+        
+        def get_watch_text( v, size):
             #text = peda.dumpmem(self, 0x7ffff7dd6090, 0x7ffff7dd60a0)
             #chain = peda.readmem(v, 100)
             #text = ""
 
-            bytes_ = peda.dumpmem(v, v + 100)
+            bytes_ = peda.dumpmem(v, v + size)
+            hexstr = bytes_.hex()
+            hextext = ""
+            for i in range( 0, len(hexstr), 2):
+                hextext += hexstr[i:i+2] + " "
+
+            #msg(hextext)
+            
             #if bytes_ is None:
             #    warning_msg("cannot retrieve memory content")
             #else:
-            hexstr = to_hexstr(bytes_)
+            
+            #hexstr = to_hexstr(bytes_)
             linelen = 16 # display 16-bytes per line
             i = 0
             text = ""
-            while hexstr:
-                 text += '%s : "%s"\n' % (blue(to_address(v+i*linelen)), hexstr[:linelen*4])
-                 hexstr = hexstr[linelen*4:]
+            while hextext:
+                 text += '%s: %s\n' % (blue(to_address(v+i*linelen)), hextext[:linelen*3])
+                 hextext = hextext[linelen*3:]
                  i += 1
             #msg(text)
             return text
+            #return "0"
 
 
-            for qi in range(0, 100):
-                text = peda.read_int( v)
-                msg( text)
-            return text
+            #for qi in range(0, 100):
+            #    text = peda.read_int( v)
+            #    msg( text)
+            #return text
 
 
         def get_reg_text(r, v):
@@ -4910,6 +4989,7 @@ class PEDACmd(object):
             text += format_reference_chain(chain)
             # text = text.ljust( _columns // 2, '*') 
             #text += "\n"
+            #a = unColorLen(text)
             return text
 
         (arch, bits) = peda.getarch()
@@ -4920,16 +5000,21 @@ class PEDACmd(object):
 
             regs = peda.getregs(" ".join(arg[1:]))
             if regname is None:
-                dump = get_watch_text( 0x7ffff7dd6090).splitlines()
+                if _watchAddr != 0: 
+                   dump = get_watch_text( 0x7ffff7dd6090, 128).splitlines()
+                else:
+                   dump = ""
+                #msg(unColorLen( blue('0.0')))
                 i = 0
                 for r in REGISTERS[bits]:
                     if r in regs:
                         #text += get_reg_text(r, regs[r]).rjust( _columns , '*'
                         name = get_reg_text( r, regs[r])
+                        #msg( unColorLen( name))
                         #msg( '=======>%d' % len(name))
                         #text  += name + " "*(71) # Add extra spaces
                         if i < len(dump):
-                            text += name.ljust(90) + dump[i] + "\n"
+                            text += name + " "*(_columns//2 - unColorLen( name)) + dump[i] + "\n"
                         else:
                             text += name + "\n" 
                         i = i + 1
