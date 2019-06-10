@@ -68,14 +68,19 @@ REGISTERS = {
 }
 
 #columns, rows = shutil.get_terminal_size(fallback=(80, 24))
-_columns, _rows = os.get_terminal_size(0)
+if pyversion is 3:
+    _columns, _rows = os.get_terminal_size(0)
+else:
+    _columns = 80
 
 ###########################################################################
 class PEDA(object):
     """
     Class for actual functions of PEDA commands
     """
-    
+
+    _dynamicBase = 0x0000                        # dynamic base address, set with 'dynamic ########'
+
     def __init__(self):
         self.SAVED_COMMANDS = {} # saved GDB user's commands
         #self._columns, self._rows = os.get_terminal_size(0)
@@ -3035,6 +3040,23 @@ class PEDACmd(object):
         # list of all available commands
         self.commands = [c for c in dir(self) if callable(getattr(self, c)) and not c.startswith("_")]
 
+
+    ##################
+    #  Dynamic utils #
+    ##################
+    def dynamic( self, *arg):
+        """
+        Set a dynamic base address. Use 0xAAAAAAAAAA as BASE address
+        Usage:
+            MYNAME 0xAAAAAAAAAAAA
+        """
+        (dynadd,) = normalize_argv(arg, 1)
+        #msg(dynadd)
+        self._dynamicBase = dynadd #eval(dynadd)
+        msg( 'New Dynamic Base Address is %x' % self._dynamicBase)
+        return
+
+
     ##################
     #   Misc Utils   #
     ##################
@@ -4337,8 +4359,8 @@ class PEDACmd(object):
             else:
                 text += peda.disassemble_around(pc, count)
 
-                lines = text.splitlines();
-                ll = int(lines[0][1:17], 16)
+                #lines = text.splitlines();
+                #ll = int(lines[0][1:17], 16)
 
                 msg(format_disasm_code(text, pc))
         else: # invalid $PC
@@ -4403,13 +4425,18 @@ class PEDACmd(object):
 
         # display assembly code
         if "code" in opt:
-            self.context_code(count)
+            self.context_code(16) #count)
 
         # display stack content, forced in case SIGSEGV
         if "stack" in opt or "SIGSEGV" in status:
             self.context_stack(count)
         msg("[%s]" % ("-"*78), "blue")
-        msg("Legend: %s, %s, %s, value" % (red("code"), blue("data"), green("rodata")))
+
+ 	# NS 10/06/2019
+        _pc = peda.getreg("pc")
+        #msg(self._dynamicBase)
+        _pc = _pc - self._dynamicBase
+        msg("Legend: %s, %s, %s, value, %s0x%x" % (red("code"), blue("data"), green("rodata"), yellow("dynamicBASE="), _pc))
 
         # display stopped reason
         if "SIG" in status:
@@ -4850,33 +4877,68 @@ class PEDACmd(object):
         if not self._is_running():
             return
 
+        def get_watch_text( v):
+            #text = peda.dumpmem(self, 0x7ffff7dd6090, 0x7ffff7dd60a0)
+            #chain = peda.readmem(v, 100)
+            #text = ""
+
+            bytes_ = peda.dumpmem(v, v + 100)
+            #if bytes_ is None:
+            #    warning_msg("cannot retrieve memory content")
+            #else:
+            hexstr = to_hexstr(bytes_)
+            linelen = 16 # display 16-bytes per line
+            i = 0
+            text = ""
+            while hexstr:
+                 text += '%s : "%s"\n' % (blue(to_address(v+i*linelen)), hexstr[:linelen*4])
+                 hexstr = hexstr[linelen*4:]
+                 i += 1
+            #msg(text)
+            return text
+
+
+            for qi in range(0, 100):
+                text = peda.read_int( v)
+                msg( text)
+            return text
+
+
         def get_reg_text(r, v):
             text = green("%s" % r.upper().ljust(3)) + ": "
             chain = peda.examine_mem_reference(v)
             text += format_reference_chain(chain)
             # text = text.ljust( _columns // 2, '*') 
-            # text += "\n"
+            #text += "\n"
             return text
 
         (arch, bits) = peda.getarch()
         if str(address).startswith("r"):
             # Register
 
-            msg( '--------->%d'% (_columns // 2))
+            #msg( '--------->%d'% (_columns // 2))
 
             regs = peda.getregs(" ".join(arg[1:]))
             if regname is None:
+                dump = get_watch_text( 0x7ffff7dd6090).splitlines()
+                i = 0
                 for r in REGISTERS[bits]:
                     if r in regs:
                         #text += get_reg_text(r, regs[r]).rjust( _columns , '*'
                         name = get_reg_text( r, regs[r])
-                        msg( '=======>%d' % len(name))
-                        text  += name + " "*(71) # Add extra spaces
+                        #msg( '=======>%d' % len(name))
+                        #text  += name + " "*(71) # Add extra spaces
+                        if i < len(dump):
+                            text += name.ljust(90) + dump[i] + "\n"
+                        else:
+                            text += name + "\n" 
+                        i = i + 1
             else:
                 for (r, v) in sorted(regs.items()):
                     text += get_reg_text(r, v)
             if text:
                 msg(text.strip())
+                #get_watch_text( 0x7ffff7dd6090)
             if regname is None or "eflags" in regname:
                 self.eflags()
             return
@@ -6198,3 +6260,5 @@ peda.execute("set step-mode on")
 peda.execute("set print pretty on")
 peda.execute("handle SIGALRM print nopass") # ignore SIGALRM
 peda.execute("handle SIGSEGV stop print nopass") # catch SIGSEGV
+peda.execute("dynamic 0x0")
+
