@@ -75,17 +75,17 @@ REGISTERS = {
 if pyversion is 3:
     _columns, _rows = os.get_terminal_size(0)
 else:
-    _columns = 80
+    _strrow, _strcolumns = os.popen('stty size', 'r').read().split()
+    _columns = to_int( _strcolumns)
 
 ###########################################################################
 class PEDA(object):
     """
     Class for actual functions of PEDA commands
     """
-
     _dynamicBase = 0x0000                        # dynamic base address, set with 'dynamic ########'
-    _watchAddr = 0x0
-    _watchSize = 0x0
+    _watchAddr = 0
+    _watchSize = 0
     
 
     def __init__(self):
@@ -3042,6 +3042,9 @@ class PEDACmd(object):
     """
     Class for PEDA commands that interact with GDB
     """
+    _watchAddr = 0
+    _watchSize = 0
+
     commands = []
     def __init__(self):
         # list of all available commands
@@ -3074,9 +3077,9 @@ class PEDACmd(object):
             MYNAME <ADDR> <SIZE>
         """
         (add, sze) = normalize_argv(arg, 2)
-        self._watchAddr = add
-        self._watchSize = sze
-        msg( 'New Watch @ %x' % self._watchAddr)
+        self._watchAddr = to_int(add)
+        self._watchSize = to_int(sze)
+        msg( 'New Watch @ %x %d' % ( self._watchAddr, self._watchSize))
         return
 
 
@@ -4921,60 +4924,37 @@ class PEDACmd(object):
         def unColorLen( _str):
             ESC = Literal('\x1b')
             integer = Word(nums)
-            #escapeSeq = Combine(ESC + '[' + Optional(delimitedList(integer,';')) +
-             #                   oneOf(list(alphas)))
-
-            #nonAnsiString = lambda s : Suppress(escapeSeq).transformString(s)
-            #unColorString = nonAnsiString( _str)
-
-
             escapeSeq = Combine(ESC + '[' + delimitedList(integer,';') + oneOf(list(alphas)))
-  
             s_prime = Suppress(escapeSeq).transformString(_str)
-            #s_prime = Suppress(escapeSeq).transformString(s_prime)
-            #msg(hex(ord(s_prime[0])))
-            #msg(s_prime[1])
-            #msg(s_prime[2])
-            #msg(s_prime[3])
-            #msg(s_prime[4])
-            #msg(s_prime[5])
-
             ansisequence= re.compile(r'\x1B\[[^A-Za-z]*[A-Za-z]')
-            #msg( len(ansisequence.sub('', _str)))
-
-
-            #print unColorString, len(unColorString)
             return len( ansisequence.sub('', _str))
-         
-        
+
+
         def get_watch_text( v, size):
-            #text = peda.dumpmem(self, 0x7ffff7dd6090, 0x7ffff7dd60a0)
-            #chain = peda.readmem(v, 100)
-            #text = ""
-
-            bytes_ = peda.dumpmem(v, v + size)
-            hexstr = bytes_.hex()
+            hexstr = ""
             hextext = ""
-            for i in range( 0, len(hexstr), 2):
-                hextext += hexstr[i:i+2] + " "
+            try:
+                bytes_ = peda.dumpmem(v, v + size)
+                if pyversion is 3:
+                   hexstr = bytes_.hex()
+                else:
+                   hexstr = ''.join( [ "%02x" % ord( x ) for x in bytes_ ] ).strip()
 
-            #msg(hextext)
-            
-            #if bytes_ is None:
-            #    warning_msg("cannot retrieve memory content")
-            #else:
-            
-            #hexstr = to_hexstr(bytes_)
-            linelen = 16 # display 16-bytes per line
-            i = 0
-            text = ""
-            while hextext:
-                 text += '%s: %s\n' % (blue(to_address(v+i*linelen)), hextext[:linelen*3])
-                 hextext = hextext[linelen*3:]
-                 i += 1
-            #msg(text)
+                for i in range( 0, len(hexstr), 2):
+                    hextext += hexstr[i:i+2] + " "
+
+                linelen = 16 # display 16-bytes per line
+                i = 0
+                text = ""
+                while hextext:
+                    text += '%s: %s\n' % (blue(to_address(v+i*linelen)), hextext[:linelen*3])
+                    hextext = hextext[linelen*3:]
+                    i += 1
+            except Exception as e:
+                msg( "trouble in paradise...\n")
+                text = "trouble in paradise...\n"
+
             return text
-            #return "0"
 
 
             #for qi in range(0, 100):
@@ -4995,16 +4975,11 @@ class PEDACmd(object):
         (arch, bits) = peda.getarch()
         if str(address).startswith("r"):
             # Register
-
-            #msg( '--------->%d'% (_columns // 2))
-
             regs = peda.getregs(" ".join(arg[1:]))
+            dump = ""
             if regname is None:
-                if _watchAddr != 0: 
-                   dump = get_watch_text( 0x7ffff7dd6090, 128).splitlines()
-                else:
-                   dump = ""
-                #msg(unColorLen( blue('0.0')))
+                dump = get_watch_text( self._watchAddr, self._watchSize).splitlines() #0x7ffff7dd6090, 128).splitlines()
+
                 i = 0
                 for r in REGISTERS[bits]:
                     if r in regs:
@@ -6346,4 +6321,3 @@ peda.execute("set print pretty on")
 peda.execute("handle SIGALRM print nopass") # ignore SIGALRM
 peda.execute("handle SIGSEGV stop print nopass") # catch SIGSEGV
 peda.execute("dynamic 0x0")
-
