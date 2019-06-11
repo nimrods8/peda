@@ -3,6 +3,12 @@ peda
 
 PEDA - Python Exploit Development Assistance for GDB
 
+New:
+
+* watch <addr> <size> - adds a memory dump watch next to the registers output
+* dynamic <BASEaddr>  - changes the dynamic BASE address of the code (for reversing .so file)
+ 
+
 ## Key Features:
 * Enhance the display of gdb: colorize and display disassembly codes, registers, memory information during debugging.
 * Add commands to support debugging and exploit development (for a full list of commands use `peda help`):
