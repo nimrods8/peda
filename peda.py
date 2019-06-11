@@ -4313,7 +4313,7 @@ class PEDACmd(object):
         # display register info
         cols = _columns // 2
         text = "[%s]" % "registers".center( cols - 2, "-") 
-        text += "[%s]" % "registers".center( cols - 2, "-")
+        text += "[%s]" % "mem dump".center( cols - 2, "-")
         #msg("[%s]" % "registers".center(78, "-"), "blue")
         #msg("[%s]" % "registers".center(78, "-"), "yellow")
         msg(text, "blue")
@@ -4933,6 +4933,7 @@ class PEDACmd(object):
         def get_watch_text( v, size):
             hexstr = ""
             hextext = ""
+            asciistr = ''
             try:
                 bytes_ = peda.dumpmem(v, v + size)
                 if pyversion is 3:
@@ -4941,18 +4942,25 @@ class PEDACmd(object):
                    hexstr = ''.join( [ "%02x" % ord( x ) for x in bytes_ ] ).strip()
 
                 for i in range( 0, len(hexstr), 2):
-                    hextext += hexstr[i:i+2] + " "
+                    ascii = hexstr[i:i+2].decode("hex")
+                    if ord(ascii) < 0x20: 
+                        ascii = '.'
+                    if ord(ascii) > 0x7f: 
+                        ascii = '.'
+                    asciistr += ascii
+                       
+                    hextext  += hexstr[i:i+2] + " "
 
                 linelen = 16 # display 16-bytes per line
                 i = 0
                 text = ""
                 while hextext:
-                    text += '%s: %s\n' % (blue(to_address(v+i*linelen)), hextext[:linelen*3])
+                    text += '%s: %s  %s\n' % (blue(to_address(v+i*linelen - self._dynamicBase)), hextext[:linelen*3].ljust(3*16), yellow(asciistr[:linelen]))
                     hextext = hextext[linelen*3:]
+                    asciistr = asciistr[linelen:]
                     i += 1
             except Exception as e:
-                msg( "trouble in paradise...\n")
-                text = "trouble in paradise...\n"
+                text =  "use watch <addr> <size> to add a dump...\n"
 
             return text
 
