@@ -58,10 +58,12 @@ if sys.version_info.major is 3:
     from urllib.request import urlopen
     from urllib.parse import urlencode
     pyversion = 3
+    msg( yellow('py version 3'))
 else:
     from urllib import urlopen
     from urllib import urlencode
     pyversion = 2
+    msg( yellow('py version 2'))
 
 REGISTERS = {
     8 : ["al", "ah", "bl", "bh", "cl", "ch", "dl", "dh"],
@@ -4936,21 +4938,41 @@ class PEDACmd(object):
             asciistr = ''
             try:
                 bytes_ = peda.dumpmem(v, v + size)
+                #msg( bytes_)
                 if pyversion is 3:
-                   hexstr = bytes_.hex()
+                   #hexstr = ''.join(bytes_).hex()
+                   #hexstr = bytes_.hex()
+                   for ib in range(0, len(bytes_)):
+                       inter = to_hex( bytes_[ib])[2:].rjust( 2, '0')
+                       hexstr += inter
+                   #msg(hexstr)
+                   #hexstr = codecs.encode(bytes_, 'hex')
+
                 else:
                    hexstr = ''.join( [ "%02x" % ord( x ) for x in bytes_ ] ).strip()
+                   #hexstr = lambda b: ' '.join('%02x' % i for i in six.iterbytes( bytes_))
+                   #text = bytes_[0]
+                   #msg(text)
+                   #for b in text:
+                   #    hexstr += "%02x" % b
 
-                for i in range( 0, len(hexstr), 2):
-                    ascii = hexstr[i:i+2].decode("hex")
+                   #msg(hexstr)
+
+                
+                for ia in range( 0, len(hexstr), 2):
+                    #ascii = hexstr[i:i+2].decode("hex")
+                    try:
+                        ascii = bytes.fromhex(hexstr[ia:ia+2]).decode('utf-8')
+                    except Exception as e:
+                        ascii = '.'
+                  
                     if ord(ascii) < 0x20: 
                         ascii = '.'
                     if ord(ascii) > 0x7f: 
                         ascii = '.'
-                    asciistr += ascii
-                       
-                    hextext  += hexstr[i:i+2] + " "
-
+                    asciistr += ascii                 
+                    hextext  += hexstr[ia:ia+2] + " "
+                    
                 linelen = 16 # display 16-bytes per line
                 i = 0
                 text = ""
