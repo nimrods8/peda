@@ -80,6 +80,8 @@ else:
     _strrow, _strcolumns = os.popen('stty size', 'r').read().split()
     _columns = to_int( _strcolumns)
 
+_dictComments = { 0: 'start of comments' }
+
 ###########################################################################
 class PEDA(object):
     """
@@ -88,7 +90,7 @@ class PEDA(object):
     _dynamicBase = 0x0000                        # dynamic base address, set with 'dynamic ########'
     _watchAddr = 0
     _watchSize = 0
-    
+
 
     def __init__(self):
         self.SAVED_COMMANDS = {} # saved GDB user's commands
@@ -3068,9 +3070,9 @@ class PEDACmd(object):
         msg( 'New Dynamic Base Address is %x' % self._dynamicBase)
         return
 
-    ##################
-    #  Dynamic utils #
-    ##################
+    #######################
+    #  watch mem address  #
+    #######################
     def watch( self, *arg):
         """
         Set a watch on address and size. 
@@ -3084,6 +3086,25 @@ class PEDACmd(object):
         msg( 'New Watch @ %x %d' % ( self._watchAddr, self._watchSize))
         return
 
+
+    ##################
+    #    Comments    #
+    ##################
+    def comment( self, *arg):
+        """
+        Set a comment at the current PC
+        Usage:
+            MYNAME <comment text>
+        """
+        (dynadd,) = normalize_argv(arg, 1)
+
+        if dynadd == '--show':
+           for key, value in _dictComments.items():
+               msg( '0x%x -> %s' % (key,value))
+        else:
+           pc = peda.getreg("pc")
+           _dictComments[pc] = dynadd
+        return
 
 
     ##################
@@ -4321,6 +4342,12 @@ class PEDACmd(object):
         msg(text, "blue")
         self.xinfo("register")
 
+        # write bt data afterwards for now
+        #msg( yellow( peda.execute_redirect("bt")))
+
+
+
+
         return
 
     @msg.bufferize
@@ -4388,6 +4415,23 @@ class PEDACmd(object):
             else:
                 text += peda.disassemble_around(pc, count)
 
+                try:
+                    ttt = text.splitlines()
+                         
+                    for (idx, line) in enumerate(ttt):
+                         if line.startswith( '=>'):
+                            line = line[3:]
+
+                         for key, value in _dictComments.items():
+                            #msg( '%s -> %d' % (yellow(line.split(":")[0]), idx))
+
+                            if ("0x%x" % key) in line.split(":")[0]:
+                                ttt[idx] += '\t\t; ' + _dictComments[key] 
+
+                    text = "\n".join(ttt)
+                except:
+                    pass
+
                 #lines = text.splitlines();
                 #ll = int(lines[0][1:17], 16)
 
@@ -4454,7 +4498,7 @@ class PEDACmd(object):
 
         # display assembly code
         if "code" in opt:
-            self.context_code(16) #count)
+            self.context_code(12) #count)
 
         # display stack content, forced in case SIGSEGV
         if "stack" in opt or "SIGSEGV" in status:
@@ -5002,6 +5046,11 @@ class PEDACmd(object):
             #a = unColorLen(text)
             return text
 
+
+        ## split bt lines...
+        textbt = yellow('\nbacktrace:').splitlines() + peda.execute_redirect("bt").splitlines()
+
+
         (arch, bits) = peda.getarch()
         if str(address).startswith("r"):
             # Register
@@ -5009,6 +5058,7 @@ class PEDACmd(object):
             dump = ""
             if regname is None:
                 dump = get_watch_text( self._watchAddr, self._watchSize).splitlines() #0x7ffff7dd6090, 128).splitlines()
+                dump += textbt
 
                 i = 0
                 for r in REGISTERS[bits]:
@@ -5029,6 +5079,7 @@ class PEDACmd(object):
             if text:
                 msg(text.strip())
                 #get_watch_text( 0x7ffff7dd6090)
+
             if regname is None or "eflags" in regname:
                 self.eflags()
             return
