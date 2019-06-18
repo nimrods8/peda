@@ -3098,12 +3098,30 @@ class PEDACmd(object):
         """
         (dynadd,) = normalize_argv(arg, 1)
 
-        if dynadd == '--show':
-           for key, value in _dictComments.items():
+
+        if dynadd == '--load':
+           with open( peda.getfile() + '.comments', 'rb') as handle:
+               peda._dictComments = pickle.loads(handle.read())
+           for key, value in peda._dictComments.items():
                msg( '0x%x -> %s' % (key,value))
+
+        elif dynadd == '--clear':
+               peda._dictComments.clear()
+
+        elif dynadd == '--show':
+           #msg( "a %d" % len(peda._dictComments))
+           for key, value in peda._dictComments.items():
+               msg( '0x%x -> %s' % (key,value))
+
         else:
            pc = peda.getreg("pc")
-           _dictComments[pc] = dynadd
+           peda._dictComments[pc] = dynadd
+
+           filename = peda.getfile() + '.comments'
+           #msg(filename)
+           with open( filename, 'wb') as handle:
+               pickle.dump(peda._dictComments, handle)
+
         return
 
 
@@ -4422,11 +4440,11 @@ class PEDACmd(object):
                          if line.startswith( '=>'):
                             line = line[3:]
 
-                         for key, value in _dictComments.items():
+                         for key, value in peda._dictComments.items():
                             #msg( '%s -> %d' % (yellow(line.split(":")[0]), idx))
 
                             if ("0x%x" % key) in line.split(":")[0]:
-                                ttt[idx] += '\t\t; ' + _dictComments[key] 
+                                ttt[idx] += '\t\t; ' + peda._dictComments[key] 
 
                     text = "\n".join(ttt)
                 except:
@@ -6340,6 +6358,10 @@ Alias("pead", "peda") # just for auto correction
 msg( 'terminal columns %d\n' % _columns)
 #raw_input("Press Enter to continue...")
 
+# construct the comments dictionary. to load dictionary from file use
+# comment --load
+peda._dictComments = { 0: 'start of comments' }
+#msg( yellow( peda._dictComments[0]))
 
 # create aliases for subcommands
 for cmd in pedacmd.commands:
@@ -6402,3 +6424,5 @@ peda.execute("set print pretty on")
 peda.execute("handle SIGALRM print nopass") # ignore SIGALRM
 peda.execute("handle SIGSEGV stop print nopass") # catch SIGSEGV
 peda.execute("dynamic 0x0")
+
+
