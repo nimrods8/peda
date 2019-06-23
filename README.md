@@ -7,6 +7,7 @@ New:
 
 * watch <addr> <size> - adds a memory dump watch next to the registers output
 * dynamic <BASEaddr>  - changes the dynamic BASE address of the code (for reversing .so file)
+* comment <text> - adds a comment at current PC
  
 
 ## Key Features:
