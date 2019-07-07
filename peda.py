@@ -3068,6 +3068,7 @@ class PEDACmd(object):
         #msg(dynadd)
         self._dynamicBase = dynadd #eval(dynadd)
         msg( 'New Dynamic Base Address is %x' % self._dynamicBase)
+        peda.execute( "set $base=0x%x" % self._dynamicBase)
         return
 
     #######################
@@ -5066,7 +5067,7 @@ class PEDACmd(object):
 
 
         ## split bt lines...
-        textbt = yellow('\nbacktrace:').splitlines() + peda.execute_redirect("bt").splitlines()
+        #textbt = yellow('\nbacktrace:').splitlines() + peda.execute_redirect("bt").splitlines()
 
 
         (arch, bits) = peda.getarch()
@@ -5076,7 +5077,7 @@ class PEDACmd(object):
             dump = ""
             if regname is None:
                 dump = get_watch_text( self._watchAddr, self._watchSize).splitlines() #0x7ffff7dd6090, 128).splitlines()
-                dump += textbt
+                #dump += textbt
 
                 i = 0
                 for r in REGISTERS[bits]:
