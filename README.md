@@ -6,7 +6,8 @@ PEDA - Python Exploit Development Assistance for GDB
 New:
 
 * watch <addr> <size> - adds a memory dump watch next to the registers output
-* dynamic <BASEaddr>  - changes the dynamic BASE address of the code (for reversing .so file)
+* dynamic <BASEaddr>  - changes the dynamic BASE address of the code (for reversing .so files)
+                        use the *$base* convenience variable as one of the registers
 * comment <text> - adds a comment at current PC
  
 
