@@ -1,5 +1,5 @@
-peda
-====
+peda - for Android library deep inspection and reversing
+========================================================
 
 PEDA - Python Exploit Development Assistance for GDB
 
