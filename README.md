@@ -7,7 +7,7 @@ New:
 
 * `watch <addr> <size>` -- adds a memory dump watch next to the registers output
 * `dynamic <BASEaddr>`  -- changes the dynamic BASE address of the code (for reversing .so files)
-                          use the *$base* convenience variable as one of the registers in order to reference the SO base address
+                          use the `*$base*` convenience variable as one of the registers in order to reference the SO base address
 * `comment <text>`      -- adds a comment at current PC
  
 
